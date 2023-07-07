@@ -1,0 +1,267 @@
+---
+title: "NYC Citibikes Report"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    css: ../../../../styles.css
+  pdf_document: default
+date: "2023-05-02"
+---
+
+# 1. Documentation
+
+#### Domain knowledge (1.1)
+
+
+NYC CitiBikes is a privately owned bike sharing system based in New York City and was established in 2013. It was set up to reduce gas emissions from cars and buses and to improve the health of the public by increasing access to bicycle sharing. When NYC Citibikes was set up, there were 332 stations around New York city and 6000 bikes, and it has grown in popularity and size with 706 stations and 17000 bikes, having extending into Bronx, Queens and other adjacent locations in New York. 
+The business model for NYC Citibikes is based on subscriptions, with a standard subscription in March 2023 as monthly ($17) or annually ($207). There are additional options for a day pass ($9.95) or by week ($25). The subscription is the cheapest option, for those who do not use this system, a single ride costs $4.49 for 30 minutes, with an additional charge for each 30 minutes thereafter. Payments are made by credit card. This information was found online, such as the NYC Citibikes website (https://ride.citibikenyc.com/about), and helped understand and direct analysis and visualisations for the company. 
+
+
+#### Business requirements (1.2)
+
+The aim for this report is to show analysis and visualisations that help inform the company about their business. In particular, some key questions were considered
+
+  - What is the pattern of bike hires over time (e.g. within a year, month, week, or day)?
+  - Do bike hire patterns differ between bike rider demographics? (e.g. gender, type of trip, age)
+  - Any other insights?
+  
+My central question for this report was to inform NYC citibikes about their customers, the journeys they take, and their provision of hire bikes. For this reason, I decided to focus my analysis around three key areas ; 
+  1. Journeys - what kind of journeys do customers take and when? This may highlight times/seasons of high demand. 
+  2. Users - who are the users of NYC Citi Bikes? (age, gender, subscriber), potentially inform new target users
+  3. Station - where are the most popular stations to start or end journeys? This could identify new areas for bicycle stations
+
+
+#### Business processes and data flow (1.3)
+The NYC Citi Bikes dataset is a sample of bicycle usage from 10 bikes in New York City in 2018. The data includes information about each trip, such as start and end times and location. Some details about the customer is also included such as gender, birth year and bike usage.
+
+The variables in the dataset, and how they were collected is included in the figure below:
+
+
+![Data flow](data_flow.png)
+
+
+#### Data visualisation as a tool for decision-making (1.4)
+
+Analysis was focused on three main themes around journeys, users and stations, this analysis will hopefully identify patterns of bike use which can help inform future decision making for the company. Patterns of bike use at times of day/year may highlight when bikes are most needed, or journeys that are most popular with users. Rider demographics will identify groups of population who are over or underrepresented and may identify new target groups of users or groups that are most likely to use citibikes but are not subscribers. Station analysis may highlight locations that are most busy, which may inform the company on where best to invest in stations, new areas to expand into or locations that are underused. 
+
+#### Data types (1.5)
+
+The dataset contains 19 variables and 4268 rows. The data contains a variety of different data formats including date/time (start_time, stop_time, journey_date), categoric data (where data is assigned to a category or label, such as weekday, month), factor (similar to categoric data but can take on a different range of values such as numbers and character, includes bike_id, start_station, end_station, gender and type), and numeric data comprising integer (whole numbers, e.g. day) and continuous (can have decimal places, e.g.latitude, longitude and birth year)
+
+
+#### Data quality and data bias (1.6)
+
+There was no information about how these 10 bikes were chosen for this data set, and therefore it is impossible to exclude the possibility of bias in the dataset. It may be that these bikes were chosen at random, but without this confirmation from the company, there is an question over the quality of the data. Furthermore, there are concerns about whether users could be identified from this dataset, as it includes information such as birth year, and gender. In addition, as there is very detailed information about location (station, latitude and longitude for start and end of journey) this could potentially be used to identify users in combination with phone tracking.
+
+
+# 2. Data cleaning
+
+#### Preparing data for visualisation (1.7)
+
+The cleaning steps performed on this dataset are as follows,
+
+  1. separated start_time into separate day/month variables to create a journey date
+  2. included a time_diff variable by subtracting start_time from stop_time to provide the journey time
+  3. created an age of user column by subtracting birth year from start_date
+  
+All the analysis was performed in R (version 4.2.2) with additional packages,
+
+  * tidyverse
+  * tsibble
+  * tsibbledata
+  * leaflet
+  * ggplot2
+
+
+```{r, include = FALSE}
+#Step 1: load libraries and data
+library(tsibbledata)
+library(tsibble)
+library(tidyverse)
+library(leaflet)
+nyc_bikes_df <- nyc_bikes
+```
+
+
+```{r, include = FALSE}
+# Step 2: Add in separate variables from "start_date" to specify day, month, year variables
+nyc_bikes_df <- nyc_bikes_df %>% 
+  mutate(day = day(start_time),
+         weekday = wday(start_time, label = TRUE),
+         month = month(start_time, label = TRUE),
+         year = year(start_time))
+```
+
+
+
+```{r, include = FALSE}
+# Step 3: Add a new variable "time_diff" for the time of each journey by subtracting the "start_time" from the "stop_time"
+nyc_bikes_diff <- nyc_bikes_df %>% 
+  mutate(time_diff = stop_time - start_time)
+```
+
+
+
+```{r, include = FALSE}
+# Step 4: Make a separate column with journey_date extracted from the start_time
+nyc_bikes_diff <- nyc_bikes_diff %>% 
+  mutate(journey_date = make_datetime(year, month, day))
+  
+```
+
+
+
+```{r, include = FALSE}
+# Step 5: Make a column for the age of each user, by subtracting birth year from start_date
+nyc_bikes <- nyc_bikes_diff %>% 
+  mutate(age_diff = year - birth_year)
+
+```
+
+# 3. Data visualisation
+
+#### Process and design (2.1, 2.7, 2.8, 2.9)
+
+Initial explorations of data focused on visualising single variables that would be of interest to NYC citi bikes, focusing on the three key areas, (users, journeys and stations) that were most important to the company. The visualisations that were selected were the ones showing information of interest to NYC citibikes, and most likely to direction actionable change. All visualisations presented accurately display the data, and are hopefully clear and understandable.
+
+#### Visualisations (2.2, 2.3, 2.4, 2.5, 2.6)
+
+**NYC citibike hire by month**
+
+The visualisation below shows how the number of bike journeys varies by month, and shows the peak use of bikes centres around summer months. The most popular month for bike journeys is August, with 728 journeys in total. February had the lowest number of bike rides with 112 journeys recorded across these 10 bikes. 
+
+
+```{r echo=FALSE}
+nyc_bikes %>% 
+  ggplot()+
+  aes(x = journey_date)+
+  geom_histogram(bins = 13, fill = "steelblue", colour = "white")+
+  theme_light()+
+  labs(
+    x = "Journey date",
+    y = "Number of journeys",
+    title = "Number of Journeys each Month in 2018",
+    subtitle = "From sample of 10 NYC Citi Bikes")+
+  theme(plot.title = element_text(size = 20, face = "bold"),
+        axis.text.x = element_text(size = 12, face = "bold"),
+        axis.text.y = element_text(size = 12, face = "bold"))
+```
+The figure above indicates the months with highest and lowest demand, and could be useful for implementing initiative to increase bike use in months with reduced journey times. For example, lower bike hire charge in winter and spring may encourage higher take up, especially for shorter journeys. 
+
+**NYC citibike hire by day of the week**
+
+Analysis of the numbers of bike hires by weekday is shown in the figure below. Interestingly, the weekdays were the most popular days for bike journeys, with Tuesday being the busiest day and sunday having the lowest number of journeys.  
+
+```{r echo=FALSE}
+nyc_bikes %>% 
+  index_by(date = weekday) %>% 
+  summarise(number = n()) %>% 
+  ggplot(aes(x = date, y = number))+
+  geom_col(fill = "steelblue")+
+  theme_light()+
+  labs(
+    x = "\nDay of the Week",
+    y = "Total number of trips\n",
+    title = "Number of Journeys by Weekday in 2018",
+    subtitle = "From sample of 10 NYC Citi Bikes")+
+  scale_y_continuous()+
+  theme(plot.title = element_text(size = 20, face = "bold"),
+        axis.text.x = element_text(size = 12, face = "bold"),
+        axis.text.y = element_text(size = 12, face = "bold")
+        )
+
+```
+This trend of bike hires during the week is useful to understand the customers, and may indicate NYC citibikes being used for commuting to work. This could be useful for the company to encourage uptake at the weekend when the number of bike hires is lower. 
+
+**Rider Demographics**
+
+The following visualisation show the different age groups of the users, which is split by sex (Male/Female/Unknown) and whether they are a Subscriber or not. The visualisations show that most of the users are subscribers and the rates of customers are very low. There are more males than females that use NYC citibikes, across all ages, although the 20-40 year old demographic has the highest use for both men and women. THere is an interesting peak in the non-subscriber/customer group at 49 years old which may indicate a default setting for the bike hire app. 
+
+```{r echo=FALSE, warning = FALSE}
+nyc_bikes %>% 
+  ggplot()+
+  aes(x = age_diff)+
+  geom_histogram(bins = 26, fill = "steelblue")+
+  facet_grid(factor(gender, levels = c("Male", "Female", "Unknown")) ~(factor(type, levels = c("Subscriber", "Customer"))))+
+  xlim(18, 71)+
+  ylim(0, 400)+
+  theme_light()+
+  labs(
+    x = "\nUser age (years)",
+    y = "Frequency count\n",
+    title = "Age, Gender and User Numbers of NYC CitiBike Riders",
+    subtitle = "From a sample of 10 NYC Citi Bikes")+
+  theme(plot.title = element_text(size = 18, face = "bold"),
+        axis.text.x = element_text(size = 12, face = "bold"),
+        axis.text.y = element_text(size = 12, face = "bold"))
+```
+
+The figures above clearly show that women use NYC citibikes more than women and this could be investigated further to understand the barriers to women cycling. For example, that the bikes are the right size and frame for women to use, and that they have a lower cross bar on the bicycle. In addition, the use of bikes reduces with at ages above 40. There could be a marketing campaign aimed at women and at over 40 year olds to promote the health and cost benefit of cycling to encourage higher uptake in these groups. 
+
+
+**Station demographics**
+
+Geospatial mapping of the start location with a colour to indicate how busy they and how many journeys are started from each station, is shown below. 
+
+```{r echo=FALSE, results = "hide"}
+start_station <- nyc_bikes %>% 
+  select(start_station, journey_date, start_lat, start_long) %>% 
+  group_by(start_station) %>% 
+  count() %>% 
+  arrange(n)
+
+start_station
+```
+
+
+```{r echo=FALSE,  results = "hide"}
+station_location <- nyc_bikes %>% 
+  select(start_station, start_lat, start_long)
+
+station_join <- start_station %>% 
+  left_join(station_location, by = "start_station") %>% 
+  select(start_station, n, start_lat, start_long) %>% 
+  mutate(busy_index = case_when(n <= 75 ~ "1 - least busy",
+                                n <= 106 ~ "2",
+                                n <= 221 ~ "3",
+                                n > 222 ~ "4 - most busy"))
+
+station_join
+```
+
+
+```{r echo=FALSE}
+pal <- colorFactor(
+  palette = c('green', 'blue', 'orange', 'red'),
+  domain = station_join$busy_index)
+```
+
+
+```{r echo=FALSE}
+leaflet(station_join) %>% 
+  addTiles() %>% 
+  addCircleMarkers(lng = ~start_long,
+             lat = ~start_lat,
+            label = ~start_station, 
+            weight = 3, 
+            color = ~pal(busy_index),
+            fillOpacity = 1,
+            stroke = TRUE) %>% 
+  addLegend("topright", 
+            pal = pal, 
+            values = station_join$busy_index, 
+            title = "NYC bike start<br>station demand", 
+            opacity = 1)
+```
+
+
+The map above shows that the most in demand start stations are 3195, 3203 and 3186 and it might be worth having additional bicycles in these stations at the start of the day. Alternatively, in the case of 3195 and 3203, there are not many bike stations nearby and it could be an investment to set up another station in these areas. Station 3203 is in a relatively isolated location, there are few other stations in the vicinity and there is an area adjacent (Hoboken) which doesn't contain any stations and it may be possible to extend into. 
+There are a great number of relatively quiet stations to start journeys from, and it might be possible to analyse the demand for these further, and consolidate some of the quiet stations. 
+
+#### Conclusion
+
+These analyses show that most of the bike journeys are within the summer and autumn months with winter and early spring as the quietest times of the year. Weekdays are the busiest time of the week for bike hires, suggesting that they could be used primarily for commuting to and from work. 
+Analysis of rider demographics showed that the men between 20-40 is the largest group of users, with women and over 40 year olds as under represented in this dataset. It is important to understand what the potential barriers are to these demographics using citibikes as they could be potential groups to target to increase bike hires. 
+Geospatial mapping showed which stations are the busiest and which are the quietest and could provide an indication of where to expand business with more stations and which might be consolidated 
+
